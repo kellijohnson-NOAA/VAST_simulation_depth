@@ -66,7 +66,7 @@ initialDataDownload <- FishData::download_catch_rates(
   error_tol = 0.01, localdir = paste0(DownloadDir, "/"))
 
 for (Species in SpeciesList) {
-for (n_x in c(100, 250, 500, 1000)) {
+for (n_x in c(125, 250, 500, 750)) {
 	# n_x <- ifelse(grepl("^WC", Species), 250, 100)  # Number of stations
   Date <- paste0("VAST_simulation_depth_", Species, "_", n_x)
   DateDir <- file.path(RootDir, Date, "/")
