@@ -40,7 +40,7 @@ SpeciesList <- c(
   "EBSBTS_Atheresthes_stomias" # EBS Arrowtooth
   )
 
-for (Speciesloop in SpeciesList[7:14]) {
+for (Speciesloop in SpeciesList) {
 for (n_x in c(125, 250, 500, 750)) {
 for (yesnodepth in c(1, 3)[1]){
   DateDir <- file.path(RootDir, "spp",
