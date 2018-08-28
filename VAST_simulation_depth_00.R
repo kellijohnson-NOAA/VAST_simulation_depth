@@ -26,6 +26,7 @@ library(TMB, warn.conflicts = TRUE, quietly = TRUE, verbose = FALSE)
 library(TMBhelper, warn.conflicts = TRUE, quietly = TRUE, verbose = FALSE)
 library(VAST, warn.conflicts = TRUE, quietly = TRUE, verbose = FALSE)
 
+library(plyr, warn.conflicts = TRUE, quietly = TRUE, verbose = FALSE)
 library(dplyr, warn.conflicts = TRUE, quietly = TRUE, verbose = FALSE)
 library(ggplot2, warn.conflicts = TRUE, quietly = TRUE, verbose = FALSE)
 library(ggmap, warn.conflicts = TRUE, quietly = TRUE, verbose = FALSE)
@@ -33,7 +34,6 @@ library(ggsn, warn.conflicts = TRUE, quietly = TRUE, verbose = FALSE)
 library(maps, warn.conflicts = TRUE, quietly = TRUE, verbose = FALSE)
 library(mapdata, warn.conflicts = TRUE, quietly = TRUE, verbose = FALSE)
 library(MBA, warn.conflicts = TRUE, quietly = TRUE, verbose = FALSE)
-library(plyr, warn.conflicts = TRUE, quietly = TRUE, verbose = FALSE)
 library(tidyr, warn.conflicts = TRUE, quietly = TRUE, verbose = FALSE)
 
 #### Directory
@@ -42,7 +42,6 @@ DateDir <- file.path(
   RootDir,
   paste0("VAST_simulation_depth_", Date),
   .Platform$file.sep)
-dir.create(DateDir, showWarnings = FALSE)
 DownloadDir <- file.path(RootDir, "downloads")
 dir.create(DownloadDir, recursive = TRUE, showWarnings = FALSE)
 # Download the data
