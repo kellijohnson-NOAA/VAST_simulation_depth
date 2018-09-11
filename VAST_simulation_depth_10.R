@@ -56,8 +56,10 @@ rawests <- Reduce(function(x,y) merge(x, y, all = TRUE),
 rawests <- reshape(rawests,
   direction = "wide", idvar = "par", timevar = "om_name")
 colnames(rawests) <- gsub(" delta|_observed|entional", "", colnames(rawests))
-rawests[grep("L", rawests$par), ]
-rawests[grep("gamma", rawests$par), ]
+# rawests[grep("L", rawests$par), ]
+# rawests[grep("gamma", rawests$par), ]
+write.csv(rawests,
+  file = file.path(RootDir, "VAST_simulation_depth_conditioningfits.csv"))
 
 # AIC of empirical models
 # todo: this needs to be made more robust
@@ -102,12 +104,6 @@ states <- rgdal::readOGR(file.path(DownloadDir, "states.shp"),
   layer = "states", stringsAsFactors = FALSE)
 states <- sp::spTransform(states, sp::CRS("+proj=longlat +datum=WGS84"))
 states <- ggplot2::fortify(states)
-
-box <- make_bbox(lat = Lat, lon = Long, data = initialDataDownload)
-big <- get_map(location = box,
-  color = "bw",
-  maptype = "terrain",
-  zoom = 5)
 
 gg <- ggplot() +
 geom_point(data = initialDataDownload[initialDataDownload$Wt > 0, ],
@@ -196,12 +192,17 @@ dev.off()
 ###############################################################################
 #### Depth effects
 for (ii in unique(keep$nknots)) {
+for (iii in c("1000", "conditioning")) {
 for (iiii in c("0.5", "conditioning")) {
 use <- keep_ae[
   grepl("Conventional", keep_ae$om_type) &
   grepl("Conventional", keep_ae$em_type) &
-  keep_ae$nknots == ii &
-  keep_ae$om_range1 != 1000, ]
+  keep_ae$nknots == ii, ]
+if (iii == "1000") {
+  use <- subset(use, om_range1 == 1000)
+} else {
+  use <- subset(use, om_range1 != 1000)
+}
 if (iiii == "0.5") {
   use <- subset(use, om_sigmao1 == 0.5)
 } else {
@@ -227,7 +228,7 @@ gg <- VASTWestCoast:::addMAE(aa,
   c("ae_depth1_km", "ae_depth2_km"),
   "om_depthtype + sigmao1_factor + em_depth + EM", gg = gg)
 ggsave(file.path(RootDir, paste0("VAST_simulation_depth_depth_",
-  ii, "knots_", iiii, ".jpeg")),
+  "sigma", iiii, "_range_", iii, "_knots_", ii, ".jpeg")),
   gg, dev = "jpeg")
 
 aa <- use[use$EM == "03", ]
@@ -248,10 +249,10 @@ gg <- VASTWestCoast:::addMAE(aa,
   c("ae_depth1_km2", "ae_depth2_km2"),
   "om_depthtype + sigmao1_factor + em_depth + EM", gg = gg)
 ggsave(file.path(RootDir, paste0(
-  "VAST_simulation_depth_depth2_quadratic", "_", ii, "knots_",
-  iiii, ".jpeg")),
+  "VAST_simulation_depth_depth2_quadratic", "_",
+  "sigma", iiii, "_range_", iii, "_knots_", ii, ".jpeg")),
   gg, dev = "jpeg")
-}}
+}}}
 dev.off()
 
 ###############################################################################
@@ -324,9 +325,24 @@ ggsave(file.path(RootDir,
   #"RepNum"=rep(1:dim(Results_index)[2],each=dim(Results_index)[1]),
   #"Year"=rep(1:dim(Results_index)[5],each=prod(dim(Results_index)[1:2])))
 # Lm = lme4::lmer(log(Est) ~ 0 + Scenario_ + log(True):Scenario_ + (1 | RepNum:Scenario_), data=DF)
-  test$scenario_ <- with(test, paste(om_depthtype, EM))
-  lmres <- lme4::lmer(log(em) ~ 0 + scenario_ + log(om):scenario_ +
-    (1 | rep:scenario_), data = test)
+test <- keep_ae[
+  grepl("Conventional", keep_ae$om_type) &
+  grepl("Conventional", keep_ae$em_type) &
+  keep_ae$EM %in% c("01", "02", "03") &
+  # keep_ae$nknots == 250 &
+  keep_ae$om_range1 != 1000 &
+  keep_ae$om_sigmao1 != 0.5, ]
+test <- reshape(test[,
+  c("om_depthtype", "em_depth", "rep", "EM", "nknots",
+    paste0("em_index_", 1:13),
+    paste0("om_index_", 1:13))],
+  varying = list(paste0("em_index_", 1:13),
+    paste0("om_index_", 1:13)),
+  v.names = c("em", "om"),
+  times = 1:13, direction = "long")
+test$scenario_ <- with(test, paste(om_depthtype, EM, nknots))
+lmres <- lme4::lmer(log(em) ~ 0 + scenario_ + log(om):scenario_ +
+  (1 | rep:scenario_), data = test)
 sink(file.path(RootDir, "VAST_simulation_depth_hypersable.txt"))
 summary(lmres)
   Coef = summary(lmres)$coef
@@ -334,14 +350,21 @@ Coef[grep(":", rownames(Coef)), ]
 sink()
 
 #### Empirical index plot
+for (pattern in c("0[2-4]_VAST", "0[1-3]_VAST")) {
 fits <- lapply(sapply(dir(RootDir,
-  pattern = "0[1-3]_VAST",
+  pattern = pattern,
   full.names = TRUE, recursive = FALSE),
   dir, full.names = TRUE, pattern = "Table"),
   read.csv, header = TRUE, sep = ",")
-fits[[3]]$depth <- "no depth"
-fits[[1]]$depth <- "linear depth"
-fits[[2]]$depth <- "quadratic depth"
+if (grepl("4", pattern)) {
+  fits[[1]]$depth <- "quadratic depth (250)"
+  fits[[2]]$depth <- "no depth (250)"
+  fits[[3]]$depth <- "quadratic depth (500)"
+} else {
+  fits[[3]]$depth <- "no depth"
+  fits[[1]]$depth <- "linear depth"
+  fits[[2]]$depth <- "quadratic depth"
+}
 fits <- do.call("rbind", fits)
 fits <- with(fits,
   data.frame(fits,
@@ -367,10 +390,12 @@ gg <- ggplot(fits, aes(Year, fit, color = as.factor(depth),
         legend.justification = c(1, 0),
         legend.position = c(0.85, 0.8)) +
     ylab("ln abundance (mt)")
+name <- ifelse(grepl("4", pattern), "Sensitivity", "")
 ggsave(file.path(RootDir,
-  "VAST_simulation_depth_rawTimeSeries.jpeg"),
+  paste0("VAST_simulation_depth_rawTimeSeries", name, ".jpeg")),
   gg, dev = "jpeg")
 dev.off()
+}
 
 ###############################################################################
 ###############################################################################
@@ -389,7 +414,7 @@ test <- plyr::ddply(subset(keep_ae,
   .(om_depthtype, em_depth),
   .fun = summarize,
   replicate2 = 1:length(rep),
-  "MAE range in observation model" = my.median(abs(ae_range1)) -
+  "MAE range in encounter model" = my.median(abs(ae_range1)) -
     median(abs(ae_range1), na.rm = TRUE),
   "MAE depth for catch-rate model" = my.median(abs(ae_depth2_km)) -
     median(abs(ae_depth2_km), na.rm = TRUE))
@@ -407,13 +432,13 @@ ggsave(file.path(RootDir,
   gg, dev = "jpeg", height = 8, width = 8)
 dev.off()
 
-pdf(file.path(RootDir, "VAST_simulation_depth_plots.pdf"))
-for (ii_name in grep("re_", colnames(keep_re), value = TRUE)) {
-  for (iii_name in grep("re_", colnames(keep_re), value = TRUE)) {
-    if (ii_name == iii_name) next
-    if (grepl("index", ii_name) | grepl("index", iii_name)) next
-    ggplotre(keep_re, ii_name, iii_name, type = "points",
-      facety = c("om_type", "om_depth", "om_sigmao1"), gradient = TRUE)
-  }
-}
-dev.off()
+# pdf(file.path(RootDir, "VAST_simulation_depth_plots.pdf"))
+# for (ii_name in grep("re_", colnames(keep_re), value = TRUE)) {
+#   for (iii_name in grep("re_", colnames(keep_re), value = TRUE)) {
+#     if (ii_name == iii_name) next
+#     if (grepl("index", ii_name) | grepl("index", iii_name)) next
+#     ggplotre(keep_re, ii_name, iii_name, type = "points",
+#       facety = c("om_type", "om_depth", "om_sigmao1"), gradient = TRUE)
+#   }
+# }
+# dev.off()

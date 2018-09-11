@@ -14,6 +14,7 @@
 in_rep <- 100
 Date <- "depthsquared"
 Species <- "WCGBTS_Sebastes_crameri"
+clusters <- 3
 
 ###############
 # Use inputs
@@ -33,7 +34,8 @@ Sim_Settings <- list(
   # The slope remains zero and is not changed.
   "beta1_slope" = 0, "beta2_slope" = 0,
   "beta1_sd" = 0, "beta2_sd" = 0,
-  "Nyears" = 10, "Nsamp_per_year" = 600,
+  # Empirical data is used to generate samples
+  "Nyears" = NULL, "Nsamp_per_year" = NULL,
   "Depth1_km" = 0, "Depth1_km2" = 0,
   "Dist_sqrtkm" = 0,
   "SigmaO1" = 0.5, "SigmaO2" = 0.5,
@@ -41,8 +43,7 @@ Sim_Settings <- list(
   "SigmaV1" = 0, "SigmaV2" = 0,
   "SigmaVY1" = 0, "SigmaVY2" = 0,
   "Range1" = 1000, "Range2" = 500, "SigmaM" = 1,
-  "ObsModel" = c(2, 0),
-  "ObsModelcondition" = c(2,1),
+  "ObsModelcondition" = c(2, 0),
   "ObsModelEM" = c(2, 0),
   "nknots" = n_x,
   "strata" = strata.limits,
@@ -51,56 +52,76 @@ Sim_Settings <- list(
   "version" = Version,
   "changepar" = c(
     "SigmaO1", "SigmaO2", "SigmaE1", "SigmaE2",
-    "Range1", "Range2"),
+    "Range1", "Range2", "Depth1_km", "Depth2_km"),
   "replicates" = 1:in_rep, "replicatesneeded" = in_rep)
 
+if ("package:VASTWestCoast" %in% search()) {
+  detach("package:VASTWestCoast", unload = TRUE)
+}
 devtools::build("d:/stockAssessment/VASTWestCoast")
 install.packages("d:/stockAssessment/VASTWestCoast_0.1.tar.gz",
   type = "source")
 library(VASTWestCoast)
-# detach("package:VASTWestCoast", unload = TRUE)
 
+RootDir <- file.path(dirname(RootDir), "VAST_simulation_new")
 Sim_Settings$depth <- "linear"
 VAST_simulation(maindir = RootDir, globalsettings = Sim_Settings,
-  n_cluster = 2)
+  n_cluster = clusters, conditiondir = file.path(RootDir, "01_VAST_simulation"))
 Sim_Settings$depth <- "squared"
+Sim_Settings$changepar <- c(Sim_Settings$changepar,
+  "Depth1_km2", "Depth2_km2")
 VAST_simulation(maindir = RootDir, globalsettings = Sim_Settings,
-  n_cluster = 2)
+  n_cluster = clusters)
 Sim_Settings$depth <- "no"
+Sim_Settings$changepar <- Sim_Settings$changepar[!grepl("Depth",
+  Sim_Settings$changepar)]
 VAST_simulation(maindir = RootDir, globalsettings = Sim_Settings,
-  n_cluster = 2)
+  n_cluster = clusters)
 Sim_Settings$depth <- "squared"
+Sim_Settings$changepar <- c(Sim_Settings$changepar,
+  "Depth1_km", "Depth2_km", "Depth1_km2", "Depth2_km2")
 Sim_Settings$nknots <- 500
 VAST_simulation(maindir = RootDir, globalsettings = Sim_Settings,
-  n_cluster = 2)
+  n_cluster = clusters)
 
 # Sensitivity
 Sim_Settings$nknots <- n_x
-Sim_Settings$changepar <- c("none")
+Sim_Settings$depth <- "squared"
+Sim_Settings$changepar <- c(
+  "Depth1_km", "Depth2_km", "Depth1_km2", "Depth2_km2")
 VAST_simulation(maindir = RootDir, globalsettings = Sim_Settings,
-  n_cluster = 2, conditiondir = file.path(RootDir, "02_VAST_simulation"))
+  n_cluster = clusters, conditiondir = file.path(RootDir, "02_VAST_simulation"))
 
-Sim_Settings$changepar <- c("SigmaO1", "SigmaO2", "SigmaE1", "SigmaE2")
+Sim_Settings$changepar <- c(
+  "Depth1_km", "Depth2_km", "Depth1_km2", "Depth2_km2",
+  "SigmaO1", "SigmaO2", "SigmaE1", "SigmaE2")
 VAST_simulation(maindir = RootDir, globalsettings = Sim_Settings,
-  n_cluster = 2, conditiondir = file.path(RootDir, "02_VAST_simulation"))
+  n_cluster = clusters, conditiondir = file.path(RootDir, "02_VAST_simulation"))
 
-Sim_Settings$changepar <- c("Range1", "Range2")
+Sim_Settings$changepar <- c(
+  "Depth1_km", "Depth2_km", "Depth1_km2", "Depth2_km2",
+  "Range1", "Range2")
 VAST_simulation(maindir = RootDir, globalsettings = Sim_Settings,
-  n_cluster = 2, conditiondir = file.path(RootDir, "02_VAST_simulation"))
+  n_cluster = clusters, conditiondir = file.path(RootDir, "02_VAST_simulation"))
 
 Sim_Settings$depth <- "linear"
 Sim_Settings$nknots <- n_x
-Sim_Settings$changepar <- c("none")
+Sim_Settings$changepar <- c(
+  "Depth1_km", "Depth2_km")
 VAST_simulation(maindir = RootDir, globalsettings = Sim_Settings,
-  n_cluster = 2, conditiondir = file.path(RootDir, "01_VAST_simulation"))
+  n_cluster = clusters, conditiondir = file.path(RootDir, "01_VAST_simulation"))
 
-Sim_Settings$changepar <- c("SigmaO1", "SigmaO2", "SigmaE1", "SigmaE2")
+Sim_Settings$changepar <- c(
+  "Depth1_km", "Depth2_km", ,
+  "SigmaO1", "SigmaO2", "SigmaE1", "SigmaE2")
 VAST_simulation(maindir = RootDir, globalsettings = Sim_Settings,
-  n_cluster = 2, conditiondir = file.path(RootDir, "01_VAST_simulation"))
+  n_cluster = clusters, conditiondir = file.path(RootDir, "01_VAST_simulation"))
 
-Sim_Settings$changepar <- c("Range1", "Range2")
+Sim_Settings$changepar <- c(
+  "Depth1_km", "Depth2_km", ,
+  "Range1", "Range2")
 VAST_simulation(maindir = RootDir, globalsettings = Sim_Settings,
-  n_cluster = 2, conditiondir = file.path(RootDir, "01_VAST_simulation"))
+  n_cluster = clusters, conditiondir = file.path(RootDir, "01_VAST_simulation"))
 
 # Delete old results files if they exist and read in the results
 sapply(dir(RootDir, pattern = "results.csv", recursive = TRUE, full.names = TRUE),
@@ -111,9 +132,9 @@ results <- lapply(
 results <- do.call("rbind", results)
 
 keep <- results[
-    results$hessian == TRUE &
-    !is.na(results$hessian) &
-    results$gradient < 0.0001, ]
+  results$hessian == TRUE &
+  !is.na(results$hessian) &
+  results$gradient < 0.0001, ]
 
 
 #### EndOfFile

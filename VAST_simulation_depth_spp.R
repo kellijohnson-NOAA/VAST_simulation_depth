@@ -105,15 +105,19 @@ dirs <- dirs[!grepl("DatabaseSave", dirs)]
 allaic <- do.call("rbind",
   mapply(VASTWestCoast:::getcompare, dirs, SIMPLIFY = FALSE))
 rownames(allaic) <- NULL
-colnames(allaic)[1:5] <- c("region", "species", "n", "AIC", "depth")
+colnames(allaic)[which(colnames(allaic) == "")] <-
+  c("region", "species", "n", "depth", "AIC")
 allaic <- as.data.frame(allaic, stringsAsFactors = FALSE)
 allaicwide <- reshape(allaic,
-  direction = "wide", timevar = "depth", idvar = c("region", "species", "n"))
+  direction = "wide",
+  timevar = "depth", idvar = c("region", "species", "n"))
 rownames(allaicwide) <- NULL
-allaicwide$delaic <- as.numeric(allaicwide$"AIC.depth") -
-  as.numeric(allaicwide$"AIC.nodepth")
-  # todo: fix the next lines
-allaicwide <- allaicwide[, -grep("FALSE|^AIC", colnames(allaicwide))]
-colnames(allaicwide) <- gsub("TRUE|\\.", "", colnames(allaicwide))
+allaicwide$delaic <- as.numeric(allaicwide$"AIC.nodepth") -
+  as.numeric(allaicwide$"AIC.depth")
+allaicwide <- allaicwide[, -grep("p.nodepth|1.nodepth", colnames(allaicwide))]
+colnames(allaicwide) <- gsub("\\.|_ctp", "", colnames(allaicwide))
+allaicwide <- cbind(
+  allaicwide[, !grepl("AIC", colnames(allaicwide), ignore.case = TRUE)],
+  allaicwide[, grep("AIC", colnames(allaicwide), ignore.case = TRUE)])
 write.table(format(allaicwide, digits = 2), sep = ",", row.names = FALSE,
   file = file.path(RootDir, "VAST_simulation_depth_SpeciesComparison.csv"))
