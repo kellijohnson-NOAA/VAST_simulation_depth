@@ -1,9 +1,9 @@
 ###############################################################################
 ###############################################################################
-## Purpose:    VAST simulation for covariates
+## Purpose:    VAST simulation for covariates with several species and knots
 ## Author:     Kelli Faye Johnson
 ## Contact:    kelli.johnson@noaa.gov
-## Date:       2018-03-26
+## Date:       2018-09-19
 ## Comments:   Adapted from VAST_simulation_2018-03-25.R (JTT)
 ###############################################################################
 ###############################################################################
@@ -42,58 +42,25 @@ SpeciesList <- c(
 
 for (Speciesloop in SpeciesList) {
 for (n_x in c(125, 250, 500, 750)) {
-for (yesnodepth in c(1, 3)[1]){
+for (yesnodepth in c("no", "linear", "squared")){
   DateDir <- file.path(RootDir, "spp",
-    paste0(Speciesloop, "_", n_x, "_",
-      ifelse(yesnodepth == 1, "nodepth", "")))
+    paste0(Speciesloop, "_", n_x, "_", yesnodepth))
   dir.create(DateDir, recursive = TRUE, showWarnings = FALSE)
 
-Sim_Settings <- list(
+spp_Settings <- list(
   "Species" = Speciesloop,
-  "ObsModelcondition" = c(2, 1),
+  "ObsModelcondition" = c(2, 0),
   "nknots" = n_x,
   "strata" = data.frame("STRATA" = "All_areas"),
-  "depth" = c("no", "linear", "squared")[yesnodepth],
+  "depth" = yesnodepth,
   "version" = Version,
   "Passcondition" = FALSE)
 
 test <- VAST_condition(
   conditiondir = DateDir,
-  settings = Sim_Settings, spp = Sim_Settings$Species,
+  settings = spp_Settings, spp = spp_Settings$Species,
   datadir = file.path(RootDir, "downloads"),
   overdisperion = NULL)
-
-
-# indexd <- read.table(dir(dir(DateDir,
-#   pattern = "delta_ob", include.dirs = TRUE, full.names = TRUE),
-#   "Table", full.names = TRUE), sep = ",", header = TRUE)
-# indexn <- read.table(dir(dir(DateDir,
-#   pattern = "nodepth", include.dirs = TRUE, full.names = TRUE),
-#   "Table", full.names = TRUE), sep = ",", header = TRUE)
-
-# gg <- ggplot() +
-# geom_ribbon(data = indexn, aes(x = Year,
-#   ymin = log(Estimate_metric_tons) - 1.96*SD_log,
-#   ymax = log(Estimate_metric_tons) + 1.96*SD_log),
-#   fill = countryColors$color[1], alpha = 0.3) +
-# geom_ribbon(data = indexd, aes(x = Year,
-#   ymin = log(Estimate_metric_tons) - 1.96*SD_log,
-#   ymax = log(Estimate_metric_tons) + 1.96*SD_log),
-#   fill = countryColors$color[80], alpha = 0.3) +
-# geom_line(data = indexd,
-#   aes(x = Year, y = log(Estimate_metric_tons)),
-#   col = countryColors$color[1]) +
-# geom_line(data = indexn,
-#   aes(x = Year, y = log(Estimate_metric_tons)),
-#   col = countryColors$color[80]) +
-#   ylab("ln abundance (mt)") +
-#   theme_bw() + theme(
-#   strip.background = element_blank(),
-#   panel.border = element_rect(colour = "black", fill = NA, size = 1)) +
-#   scale_x_continuous(breaks = indexn$Year)
-
-# ggsave(paste0(DateDir, basename(DateDir), "_index_log.jpeg"),
-#   gg, dev = "jpeg")
 }}}
 
 dirs <- dir(file.path(RootDir, "spp"),
@@ -105,19 +72,23 @@ dirs <- dirs[!grepl("DatabaseSave", dirs)]
 allaic <- do.call("rbind",
   mapply(VASTWestCoast:::getcompare, dirs, SIMPLIFY = FALSE))
 rownames(allaic) <- NULL
-colnames(allaic)[which(colnames(allaic) == "")] <-
-  c("region", "species", "n", "depth", "AIC")
+colnames(allaic) <-
+  c("region", "species", "n", "depth", "AIC", "d1", "d12", "d2", "d22")
 allaic <- as.data.frame(allaic, stringsAsFactors = FALSE)
+allaic$depth <- ifelse(allaic$d1 == 0 & allaic$d12 == 0, "no", "linear")
+allaic$depth <- ifelse(allaic$d12 != 0 & allaic$d22 != 0,
+  "quadratic", allaic$depth)
 allaicwide <- reshape(allaic,
   direction = "wide",
   timevar = "depth", idvar = c("region", "species", "n"))
 rownames(allaicwide) <- NULL
-allaicwide$delaic <- as.numeric(allaicwide$"AIC.nodepth") -
-  as.numeric(allaicwide$"AIC.depth")
-allaicwide <- allaicwide[, -grep("p.nodepth|1.nodepth", colnames(allaicwide))]
-colnames(allaicwide) <- gsub("\\.|_ctp", "", colnames(allaicwide))
-allaicwide <- cbind(
-  allaicwide[, !grepl("AIC", colnames(allaicwide), ignore.case = TRUE)],
-  allaicwide[, grep("AIC", colnames(allaicwide), ignore.case = TRUE)])
-write.table(format(allaicwide, digits = 2), sep = ",", row.names = FALSE,
+allaicwide$delaicL <- format(as.numeric(allaicwide$"AIC.no") -
+  as.numeric(allaicwide$"AIC.linear"), digits = 2, nsmall = 2)
+allaicwide$delaicQ <- format(as.numeric(allaicwide$"AIC.no") -
+  as.numeric(allaicwide$"AIC.quadratic"), digits = 2, nsmall = 2)
+cols <- c("species", "n", 
+  grep("d.+quadratic", colnames(allaicwide), value = TRUE),
+  grep("AIC", colnames(allaicwide), value = TRUE, ignore.case = TRUE))
+allaicwide <- allaicwide[, cols]
+write.table(allaicwide, sep = ",", row.names = FALSE,
   file = file.path(RootDir, "VAST_simulation_depth_SpeciesComparison.csv"))
